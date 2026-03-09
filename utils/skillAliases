@@ -1,0 +1,9 @@
+module.exports = {
+  "nodejs": "node",
+  "node.js": "node",
+  "rest api": "api",
+  "apis": "api",
+  "k8s": "kubernetes",
+  "js": "javascript",
+  "ts": "typescript"
+};

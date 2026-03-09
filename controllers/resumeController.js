@@ -1,101 +1,135 @@
 const Resume = require("../models/Resume");
 const { extractTextFromPDF } = require("../utils/pdfParser");
 const { summarizeText } = require("../utils/aiService");
+const { generateSuggestions } = require("../utils/suggestionService");
+const { scanATS } = require("../utils/atsScanner");
 const fs = require("fs");
-console.log("PDF Parser Import:", extractTextFromPDF);
-const uploadResume = async (req, res) => {
-  try {
-    const jobDescription = req.body.jobDescription;
-    console.log("====== JOB DESCRIPTION RECEIVED ======");
-    console.log(jobDescription);
-    console.log("=====================================");
+const skillDictionary = require("../utils/skillDictionary");
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-
-    const filePath = req.file.path;
-
-    const resumeText = await extractTextFromPDF(filePath);
-    const resumeSummary = await summarizeText(resumeText);
-    const jobSummary = await summarizeText(jobDescription);
-
-    // const resumeWords = resumeText.toLowerCase().split(/\W+/);
-    // const jobWords = jobDescription.toLowerCase().split(/\W+/);
-
-    // const commonWords = jobWords.filter(word => resumeWords.includes(word));
-
-    // const matchScore = Math.min(
-    //   100,
-    //   Math.round((commonWords.length / jobWords.length) * 100)
-    // );
-
-    // ---- SMART MATCHING LOGIC ----
-
-    // -------- SKILL EXTRACTION --------
-
-// Core tech skills we care about
-const techSkills = [
-  "flutter","dart","rest","api","bloc","provider","riverpod",
-  "mvvm","clean","architecture","firebase","jwt","oauth",
-  "git","ci","cd","docker","play","store","app","store",
-  "android","ios","json","authentication","secure","storage"
+const TECH_KEYWORDS = [
+"node","nestjs","react","angular","vue","flutter","dart",
+"docker","kubernetes","aws","gcp","azure",
+"postgresql","mysql","mongodb","redis",
+"jwt","oauth","passport","authentication",
+"api","rest","graphql","microservices",
+"typescript","javascript",
+"ci","cd","testing","jest","mocha",
+"swagger","openapi",
+"prisma","typeorm"
 ];
 
 const normalize = (text) =>
   text
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/[^a-z0-9+#.\s]/g, " ")
     .split(/\s+/);
 
-// Resume words
-const resumeWords = new Set(normalize(resumeText));
+const uploadResume = async (req,res)=>{
 
-// Job words
-const jobWords = new Set(normalize(jobDescription));
+try{
 
-// Extract only tech skills from job description
-const jobSkills = techSkills.filter(skill => jobWords.has(skill));
+const jobDescription = req.body.jobDescription;
 
-// Find matches
-const matchedKeywords = jobSkills.filter(skill => resumeWords.has(skill));
+if(!req.file){
+return res.status(400).json({message:"No file uploaded"});
+}
 
-// Missing skills
-const missingKeywords = jobSkills.filter(skill => !resumeWords.has(skill));
+const filePath = req.file.path;
+
+const resumeText = await extractTextFromPDF(filePath);
+
+const { atsScore, atsWarnings } = scanATS(resumeText);
+
+const resumeSummary = await summarizeText(resumeText);
+
+const resumeTextNormalized = resumeText.toLowerCase();
+const jobTextNormalized = jobDescription.toLowerCase();
+
+// Extract skills from JD
+const jobSkills = skillDictionary.filter(skill =>
+  jobTextNormalized.includes(skill)
+);
+
+// Extract skills from Resume
+const resumeSkills = skillDictionary.filter(skill =>
+  resumeTextNormalized.includes(skill)
+);
+
+// Matched
+const matchedKeywords = jobSkills.filter(skill =>
+  resumeSkills.includes(skill)
+);
+
+// Missing
+const missingKeywords = jobSkills.filter(skill =>
+  !resumeSkills.includes(skill)
+);
 
 // Score
 let matchScore = 0;
 
 if (jobSkills.length > 0) {
-  matchScore = Math.round((matchedKeywords.length / jobSkills.length) * 100);
+  matchScore = Math.round(
+    (matchedKeywords.length / jobSkills.length) * 100
+  );
 }
 
-// Save result in DB
+const suggestions = generateSuggestions(missingKeywords);
+
 const savedResume = await Resume.create({
-  user: req.user._id,
-  originalText: resumeText,
-  summary: resumeSummary,
-  matchScore,
-  jobDescription,
+user:req.user._id,
+originalText:resumeText,
+summary:resumeSummary,
+matchScore,
+jobDescription
 });
 
-// Delete uploaded file
 fs.unlinkSync(filePath);
 
-// Send response to frontend
 res.json({
-  summary: resumeSummary,
-  jobSummary,
-  matchScore,
-  matchedKeywords,
-  missingKeywords,
-  resumeId: savedResume._id,
+summary:resumeSummary,
+matchScore,
+matchedKeywords,
+missingKeywords,
+suggestions,
+atsScore,
+atsWarnings,
+resumeId:savedResume._id
 });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Resume processing failed" });
-  }
+}catch(error){
+
+console.error(error);
+
+res.status(500).json({
+message:"Resume processing failed"
+});
+
+}
+
 };
 
-module.exports = { uploadResume };
+const getResumeHistory = async (req,res)=>{
+
+try{
+
+const resumes = await Resume
+.find({user:req.user._id})
+.sort({createdAt:-1});
+
+res.json(resumes);
+
+}catch(error){
+
+res.status(500).json({
+message:"Failed to fetch resume history"
+});
+
+}
+
+};
+
+module.exports={
+uploadResume,
+getResumeHistory
+};
