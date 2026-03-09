@@ -18,6 +18,10 @@ app.use(cors());
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/resume", require("./routes/resumeRoutes"));
 
+app.get("/", (req, res) => {
+  res.send("Smart Hire API is running 🚀");
+});
+
 app.get("/api/protected", protect, (req, res) => {
   res.json({
     message: "You accessed protected route",
