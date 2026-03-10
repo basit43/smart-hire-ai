@@ -6,24 +6,6 @@ const { scanATS } = require("../utils/atsScanner");
 const fs = require("fs");
 const skillDictionary = require("../utils/skillDictionary");
 
-const TECH_KEYWORDS = [
-"node","nestjs","react","angular","vue","flutter","dart",
-"docker","kubernetes","aws","gcp","azure",
-"postgresql","mysql","mongodb","redis",
-"jwt","oauth","passport","authentication",
-"api","rest","graphql","microservices",
-"typescript","javascript",
-"ci","cd","testing","jest","mocha",
-"swagger","openapi",
-"prisma","typeorm"
-];
-
-const normalize = (text) =>
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9+#.\s]/g, " ")
-    .split(/\s+/);
-
 const uploadResume = async (req,res)=>{
 
 try{
