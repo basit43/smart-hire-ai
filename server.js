@@ -3,9 +3,19 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const protect = require("./middleware/authMiddleware");
-console.log("Protect middleware:", protect);
+const fs = require("fs");
+const path = require("path");
+
 dotenv.config();
+
 const app = express();
+
+// Ensure uploads folder exists
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
 // Connect Database
 connectDB();
@@ -17,10 +27,6 @@ app.use(cors());
 // routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/resume", require("./routes/resumeRoutes"));
-
-app.get("/", (req, res) => {
-  res.send("Smart Hire API is running 🚀");
-});
 
 app.get("/api/protected", protect, (req, res) => {
   res.json({
